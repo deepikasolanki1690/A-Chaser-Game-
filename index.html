@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Animal Chaser: Silent Vibe Edition</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; margin: 0; padding: 10px; background: #f0f4f8; touch-action: manipulation; user-select: none; }
+        
+        .header-box { display: flex; justify-content: space-around; background: #34495e; color: white; padding: 10px; border-radius: 12px; max-width: 90vw; margin: 0 auto 10px auto; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .score-title { font-weight: bold; color: #f1c40f; }
+
+        .select-container { margin: 10px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+        select { padding: 8px 12px; font-size: 14px; border-radius: 8px; border: 2px solid #34495e; background: white; font-weight: bold; cursor: pointer; }
+
+        #game-container {
+            position: relative;
+            width: 90vw; height: 320px; max-width: 450px;
+            margin: 10px auto; border: 5px solid #34495e; border-radius: 20px;
+            overflow: hidden; 
+            transition: background 0.4s ease; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .character { position: absolute; font-size: 38px; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; transition: left 0.1s ease-out, top 0.1s ease-out, transform 0.1s ease; }
+        
+        /* Smooth Eating Transition */
+        @keyframes eatEffect {
+            0% { transform: scale(1.2); opacity: 1; }
+            50% { transform: scale(0.5); opacity: 0.5; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        .eating-anim { animation: eatEffect 0.25s forwards ease-in; }
+
+        /* Controls Area */
+        .controls { display: grid; grid-template-columns: repeat(3, 80px); gap: 10px; justify-content: center; margin: 15px auto; }
+        .btn { padding: 16px 0; font-size: 24px; background: #34495e; color: white; border: none; border-radius: 15px; cursor: pointer; box-shadow: 0 5px #2c3e50; transition: transform 0.05s; }
+        .btn:active { transform: translateY(4px); box-shadow: 0 1px #2c3e50; }
+        .btn-up { grid-column: 2; }
+        .btn-left { grid-column: 1; }
+        .btn-down { grid-column: 2; }
+        .btn-right { grid-column: 3; }
+    </style>
+</head>
+<body>
+
+    <h3>🐾 Animal Chaser</h3>
+
+    <div class="header-box">
+        <div>🏆 Score: <span id="score-val" class="score-title">0</span></div>
+        <div>🥇 High Score: <span id="highscore-val">0</span></div>
+    </div>
+
+    <div class="select-container">
+        <select id="theme-select" onchange="updateTheme(this.value)">
+            <option value="classic">🌤️ Pastel Sky Blue</option>
+            <option value="forest">🌲 Cozy Pastel Green</option>
+            <option value="desert">🌵 Warm Pastel Peach</option>
+            <option value="space">🚀 Dreamy Pastel Purple</option>
+        </select>
+
+        <select id="animal-select" onchange="updateCharacter('player', this.value)">
+            <option value="🐱">🐱 Cat</option>
+            <option value="🐶">🐶 Dog</option>
+            <option value="🦁">🦁 Lion</option>
+            <option value="🐵">🐵 Monkey</option>
+        </select>
+
+        <select id="food-select" onchange="updateCharacter('target', this.value)">
+            <option value="🍎">🍎 Apple</option>
+            <option value="🦴">🦴 Bone</option>
+            <option value="🥩">🥩 Meat</option>
+            <option value="🍌">🍌 Banana</option>
+        </select>
+
+        <select id="speed-select" onchange="updateSpeed(this.value)">
+            <option value="25">🟢 Easy</option>
+            <option value="35">🟡 Medium</option>
+            <option value="45">🔴 Hard</option>
+        </select>
+    </div>
+
+    <div id="game-container">
+        <div id="player" class="character">🐱</div>
+        <div id="target" class="character">🍎</div>
+        <div id="enemy" class="character">👾</div>
+    </div>
+
+    <div class="controls">
+        <button class="btn btn-up" onclick="move('up')">▲</button>
+        <button class="btn btn-left" onclick="move('left')">◀</button>
+        <button class="btn btn-down" onclick="move('down')">▼</button>
+        <button class="btn btn-right" onclick="move('right')">▶</button>
+    </div>
+
+    <audio id="catch-sound" crossorigin="anonymous" src="https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg"></audio>
+    <audio id="hit-sound" crossorigin="anonymous" src="https://actions.google.com/sounds/v1/cartoon/slide_whistle_to_drum_pop.ogg"></audio>
+
+    <script>
+        let px = 50, py = 50, tx = 200, ty = 150, ex = 100, ey = 200;
+        let score = 0;
+        let stepSpeed = 25;
+        let highScore = localStorage.getItem('chaserHighScore') || 0;
+        let isEating = false;
+
+        const player = document.getElementById('player');
+        const target = document.getElementById('target');
+        const enemy = document.getElementById('enemy');
+        const container = document.getElementById('game-container');
+        const scoreVal = document.getElementById('score-val');
+        const highscoreVal = document.getElementById('highscore-val');
+        const catchSound = document.getElementById('catch-sound');
+        const hitSound = document.getElementById('hit-sound');
+
+        const themes = {
+            classic: "#e0f2fe", 
+            forest: "#dcfce7",  
+            desert: "#ffedd5",  
+            space: "#faf5ff"    
+        };
+
+        const animalEatingMap = {
+            "🐱": "😋",
+            "🐶": "👅",
+            "🦁": "😋",
+            "🐵": "😋"
+        };
+
+        highscoreVal.innerText = highScore;
+        updateTheme('classic');
+
+        function updateTheme(themeName) {
+            container.style.background = themes[themeName];
+        }
+
+        function updateCharacter(type, emoji) {
+            document.getElementById(type).innerText = emoji;
+        }
+
+        function updateSpeed(val) {
+            stepSpeed = parseInt(val);
+        }
+
+        function move(dir) {
+            const charSize = 42;
+            const limitX = container.clientWidth - charSize - 10;
+            const limitY = 320 - charSize - 10;
+
+            if (dir === 'up') py = Math.max(10, py - stepSpeed);
+            if (dir === 'down') py = Math.min(limitY, py + stepSpeed);
+            if (dir === 'left') px = Math.max(10, px - stepSpeed);
+            if (dir === 'right') px = Math.min(limitX, px + stepSpeed);
+            
+            update(); 
+            checkCollision();
+        }
+
+        function update() {
+            player.style.left = px + 'px';
+            player.style.top = py + 'px';
+            target.style.left = tx + 'px';
+            target.style.top = ty + 'px';
+            enemy.style.left = ex + 'px';
+            enemy.style.top = ey + 'px';
+        }
+
+        function spawnTarget() {
+            const charSize = 42;
+            tx = Math.floor(Math.random() * (container.clientWidth - charSize - 20)) + 10;
+            ty = Math.floor(Math.random() * (320 - charSize - 20)) + 10;
+            update();
+        }
+
+        function spawnEnemy() {
+            const charSize = 42;
+            ex = Math.floor(Math.random() * (container.clientWidth - charSize - 20)) + 10;
+            ey = Math.floor(Math.random() * (320 - charSize - 20)) + 10;
+            
+            if(Math.abs(px - ex) < 45 && Math.abs(py - ey) < 45) {
+                spawnEnemy();
+            }
+            update();
+        }
+
+        function checkCollision() {
+            const collisionDistance = 35;
+
+            // Food Catch Logic
+            if(Math.abs(px - tx) < collisionDistance && Math.abs(py - ty) < collisionDistance && !isEating) {
+                isEating = true;
+                
+                catchSound.currentTime = 0;
+                catchSound.play().catch(e => console.log("Audio play blocked"));
+
+                const originalAnimal = document.getElementById('animal-select').value;
+                player.innerText = animalEatingMap[originalAnimal] || "😋";
+
+                target.classList.add('eating-anim');
+
+                setTimeout(() => {
+                    score++;
+                    scoreVal.innerText = score;
+
+                    if(score > highScore) {
+                        highScore = score;
+                        localStorage.setItem('chaserHighScore', highScore);
+                        highscoreVal.innerText = highScore;
+                    }
+
+                    target.classList.remove('eating-anim');
+                    player.innerText = originalAnimal; 
+                    spawnTarget();
+                    isEating = false;
+
+                    if(Math.random() > 0.45) spawnEnemy();
+                }, 250); 
+            }
+
+            // Enemy Obstacle Hit Logic
+            if(Math.abs(px - ex) < collisionDistance && Math.abs(py - ey) < collisionDistance) {
+                hitSound.currentTime = 0;
+                hitSound.play().catch(e => console.log("Audio play blocked"));
+                
+                if (score > 0) score--;
+                scoreVal.innerText = score;
+                spawnEnemy();
+            }
+        }
+
+        spawnTarget();
+        spawnEnemy();
+    </script>
+</body>
+              </html>
+  
