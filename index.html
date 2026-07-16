@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Animal Chaser: Cute Vibe Edition</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; margin: 0; padding: 10px; background: #f7f9fc; touch-action: manipulation; user-select: none; }
+        
+        .header-box { display: flex; justify-content: space-around; background: #2c3e50; color: white; padding: 12px; border-radius: 12px; max-width: 90vw; margin: 0 auto 10px auto; font-size: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .score-title { font-weight: bold; color: #f1c40f; }
+
+        .select-container { margin: 10px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+        select { padding: 8px 12px; font-size: 14px; border-radius: 8px; border: 2px solid #2c3e50; background: white; font-weight: bold; cursor: pointer; }
+
+        #game-container {
+            position: relative;
+            width: 90vw; height: 340px; max-width: 500px;
+            margin: 10px auto; border: 5px solid #2c3e50; border-radius: 20px;
+            overflow: hidden; background-size: cover; background-position: center;
+            transition: background 0.5s ease; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .character { position: absolute; font-size: 42px; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; transition: left 0.1s ease-out, top 0.1s ease-out; }
+        
+        /* Cute Catching Bounce Animation */
+        @keyframes catchEffect {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.5); }
+            100% { transform: scale(1); }
+        }
+        .caught-anim { animation: catchEffect 0.3s ease-out; }
+
+        /* Controls Area */
+        .controls { display: grid; grid-template-columns: repeat(3, 85px); gap: 12px; justify-content: center; margin: 15px auto; }
+        .btn { padding: 18px 0; font-size: 24px; background: #2c3e50; color: white; border: none; border-radius: 15px; cursor: pointer; box-shadow: 0 5px #1a252f; transition: transform 0.05s; }
+        .btn:active { transform: translateY(4px); box-shadow: 0 1px #1a252f; }
+        .btn-up { grid-column: 2; }
+        .btn-left { grid-column: 1; }
+        .btn-down { grid-column: 2; }
+        .btn-right { grid-column: 3; }
+
+        .audio-btn { background: #e74c3c; color: white; padding: 8px 15px; border: none; border-radius: 20px; font-weight: bold; margin-bottom: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h3>🐾 Animal Chaser: Cute Edition</h3>
+    
+    <button class="audio-btn" id="music-toggle" onclick="toggleMusic()">🎵 Start Music</button>
+
+    <div class="header-box">
+        <div>🏆 Score: <span id="score-val" class="score-title">0</span></div>
+        <div>🥇 High Score: <span id="highscore-val">0</span></div>
+    </div>
+
+    <div class="select-container">
+        <select id="theme-select" onchange="updateTheme(this.value)">
+            <option value="classic">🌤️ Cute Sky</option>
+            <option value="forest">🌲 Cozy Forest</option>
+            <option value="desert">🌵 Pastel Desert</option>
+            <option value="space">🚀 Dreamy Space</option>
+        </select>
+
+        <select id="animal-select" onchange="updateCharacter('player', this.value)">
+            <option value="🐱">🐱 Cat</option>
+            <option value="🐶">🐶 Dog</option>
+            <option value="🦁">🦁 Lion</option>
+            <option value="🐵">🐵 Monkey</option>
+        </select>
+
+        <select id="food-select" onchange="updateCharacter('target', this.value)">
+            <option value="🍎">🍎 Apple</option>
+            <option value="🦴">🦴 Bone</option>
+            <option value="🥩">🥩 Meat</option>
+            <option value="🍌">🍌 Banana</option>
+        </select>
+
+        <select id="speed-select" onchange="updateSpeed(this.value)">
+            <option value="25">🟢 Easy</option>
+            <option value="40">🟡 Medium</option>
+            <option value="55">🔴 Hard</option>
+        </select>
+    </div>
+
+    <div id="game-container">
+        <div id="player" class="character">🐱</div>
+        <div id="target" class="character">🍎</div>
+        <div id="enemy" class="character">👾</div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button class="btn btn-up" onclick="move('up')">▲</button>
+        <button class="btn btn-left" onclick="move('left')">◀</button>
+        <button class="btn btn-down" onclick="move('down')">▼</button>
+        <button class="btn btn-right" onclick="move('right')">▶</button>
+    </div>
+
+    <!-- Audio Files -->
+    <audio id="bg-music" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"></audio>
+    <audio id="catch-sound" src="https://assets.mixkit.co/active_storage/sfx/2019/2019-84.wav"></audio>
+    <audio id="hit-sound" src="https://assets.mixkit.co/active_storage/sfx/913/913-200.wav"></audio>
+
+    <script>
+        let px = 50, py = 50, tx = 200, ty = 150, ex = 100, ey = 200;
+        let score = 0;
+        let stepSpeed = 25;
+        let highScore = localStorage.getItem('chaserHighScore') || 0;
+        let musicPlaying = false;
+
+        const player = document.getElementById('player');
+        const target = document.getElementById('target');
+        const enemy = document.getElementById('enemy');
+        const container = document.getElementById('game-container');
+        const scoreVal = document.getElementById('score-val');
+        const Math_abs = Math.abs;
+        const jsonLocal = localStorage;
+        const highscoreVal = document.getElementById('highscore-val');
+        const bgMusic = document.getElementById('bg-music');
+        const catchSound = document.getElementById('catch-sound');
+        const hitSound = document.getElementById('hit-sound');
+        const musicToggle = document.getElementById('music-toggle');
+
+        // Playful, cute cartoon vector illustrations instead of real photos!
+        const themes = {
+            classic: "url('https://img.freepik.com/free-vector/hand-drawn-clouds-background_23-2148960867.jpg')",
+            forest: "url('https://img.freepik.com/free-vector/flat-forest-landscape-background_23-2148158223.jpg')",
+            desert: "url('https://img.freepik.com/free-vector/flat-desert-landscape-background_23-2148149811.jpg')",
+            space: "url('https://img.freepik.com/free-vector/cartoon-space-background-with-planets_23-2148187805.jpg')"
+        };
+
+        highscoreVal.innerText = highScore;
+        updateTheme('classic');
+
+        function updateTheme(themeName) {
+            container.style.backgroundImage = themes[themeName];
+        }
+
+        function updateCharacter(type, emoji) {
+            document.getElementById(type).innerText = emoji;
+        }
+
+        function updateSpeed(val) {
+            stepSpeed = parseInt(val);
+        }
+
+        function toggleMusic() {
+            if (!musicPlaying) {
+                bgMusic.volume = 0.2;
+                bgMusic.play().catch(e => console.log("Audio blocked"));
+                musicToggle.innerText = "⏸️ Pause Music";
+                musicToggle.style.background = "#2ecc71";
+                musicPlaying = true;
+            } else {
+                bgMusic.pause();
+                musicToggle.innerText = "🎵 Start Music";
+                musicToggle.style.background = "#e74c3c";
+                musicPlaying = false;
+            }
+        }
+
+        function move(dir) {
+            const boxHeight = 340;
+            if(dir === 'up' && py >= stepSpeed) py -= stepSpeed;
+            if(dir === 'down' && py <= (boxHeight - 65)) py += stepSpeed;
+            if(dir === 'left' && px >= stepSpeed) px -= stepSpeed;
+            if(dir === 'right' && px <= (container.clientWidth - 55)) px += stepSpeed;
+            
+            update(); 
+            checkCollision();
+        }
+
+        function update() {
+            player.style.left = px + 'px';
+            player.style.top = py + 'px';
+            target.style.left = tx + 'px';
+            target.style.top = ty + 'px';
+            enemy.style.left = ex + 'px';
+            enemy.style.top = ey + 'px';
+        }
+
+        function spawnTarget() {
+            tx = Math.floor(Math.random() * (container.clientWidth - 55));
+            ty = Math.floor(Math.random() * (340 - 65));
+            update();
+        }
+
+        function spawnEnemy() {
+            ex = Math.floor(Math.random() * (container.clientWidth - 55));
+            ey = Math.floor(Math.random() * (340 - 65));
+            if(Math_abs(px - ex) < 40 && Math_abs(py - ey) < 40) {
+                spawnEnemy();
+            }
+            update();
+        }
+
+        function checkCollision() {
+            // Target Catch Logic
+            if(Math_abs(px - tx) < 35 && Math_abs(py - ty) < 35) {
+                catchSound.currentTime = 0;
+                catchSound.play();
+
+                // Cute Bounce effect
+                target.classList.add('caught-anim');
+                setTimeout(() => target.classList.remove('caught-anim'), 300);
+
+                score++;
+                scoreVal.innerText = score;
+
+                if(score > highScore) {
+                    highScore = score;
+                    jsonLocal.setItem('chaserHighScore', highScore);
+                    highscoreVal.innerText = highScore;
+                }
+                spawnTarget();
+                if(Math.random() > 0.4) spawnEnemy();
+            }
+
+            // Enemy Hit Logic
+            if(Math_abs(px - ex) < 35 && Math_abs(py - ey) < 35) {
+                hitSound.currentTime = 0;
+                hitSound.play();
+                
+                if (score > 0) score--;
+                scoreVal.innerText = score;
+                spawnEnemy();
+            }
+        }
+
+        spawnTarget();
+        spawnEnemy();
+    </script>
+</body>
+              </html>
+              
