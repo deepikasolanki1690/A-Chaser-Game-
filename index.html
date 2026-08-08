@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Animal Chaser: Ultimate Edition</title>
+    <style>
+        * { box-sizing: border-box; touch-action: manipulation; user-select: none; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            text-align: center; margin: 0; padding: 10px; background: #f0f4f8;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh;
+        }
+
+        /* Top Header Box */
+        .header-box {
+            display: flex; justify-content: space-between; align-items: center; 
+            background: #2c3e50; color: white; padding: 10px 16px; border-radius: 16px; 
+            width: 92vw; max-width: 450px; font-size: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-bottom: 10px;
+        }
+        .score-title { font-weight: bold; color: #f1c40f; }
+        .lives-box { letter-spacing: 2px; font-size: 16px; }
+        .sound-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: white; outline: none; }
+
+        /* Dropdowns Layout */
+        .select-container { 
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; 
+            width: 92vw; max-width: 450px; margin-bottom: 10px; 
+        }
+        select { 
+            padding: 8px 10px; font-size: 13px; border-radius: 10px; 
+            border: 2px solid #2c3e50; background: white; font-weight: bold; cursor: pointer; 
+        }
+
+        /* Main Game Container */
+        #game-container {
+            position: relative; width: 92vw; height: 340px; max-width: 450px;
+            border-radius: 24px; overflow: hidden; background: #e0f2fe;
+            box-shadow: 0 12px 28px rgba(0,0,0,0.15); border: 4px solid #2c3e50;
+            transition: background 0.4s ease;
+        }
+
+        .character {
+            position: absolute; font-size: 38px; width: 42px; height: 42px;
+            display: flex; align-items: center; justify-content: center;
+            transition: left 0.08s ease-out, top 0.08s ease-out;
+        }
+
+        /* Speed Boost Effect */
+        .boost-active { filter: drop-shadow(0 0 10px #f1c40f); transform: scale(1.15); }
+
+        /* Screen Shake Animation */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-3px, 0px) rotate(-1deg); }
+            40% { transform: translate(3px, 2px) rotate(1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            80% { transform: translate(3px, 1px) rotate(1deg); }
+            100% { transform: translate(1px, -2px) rotate(0deg); }
+        }
+        .shake-effect { animation: shake 0.25s ease-in-out; }
+
+        /* Floating Score Text (+1 / -1) */
+        .floating-text {
+            position: absolute; font-weight: bold; font-size: 22px;
+            pointer-events: none; animation: floatUp 0.6s forwards ease-out; z-index: 10;
+        }
+        .plus-one { color: #2ecc71; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .minus-one { color: #e74c3c; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-35px) scale(1.3); }
+        }
+
+        /* Crown Popup Animation on Head */
+        .crown-popup {
+            position: absolute; font-size: 32px; pointer-events: none;
+            animation: crownFloat 1.2s forwards ease-out; z-index: 30;
+            filter: drop-shadow(0 4px 8px rgba(241, 196, 15, 0.6));
+        }
+
+        @keyframes crownFloat {
+            0% { opacity: 0; transform: translateY(0) scale(0.3); }
+            20% { opacity: 1; transform: translateY(-25px) scale(1.3); }
+            80% { opacity: 1; transform: translateY(-35px) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(0.8); }
+        }
+
+        /* Controls */
+        .hint { margin-top: 6px; font-size: 11px; color: #7f8c8d; font-weight: bold; }
+        .controls { display: grid; grid-template-columns: repeat(3, 68px); gap: 6px; justify-content: center; margin-top: 8px; }
+        .btn { padding: 10px 0; font-size: 20px; background: #2c3e50; color: white; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px #1a252f; }
+        .btn:active { transform: translateY(3px); box-shadow: 0 1px #1a252f; }
+        .btn-up { grid-column: 2; }
+        .btn-left { grid-column: 1; }
+        .btn-down { grid-column: 2; }
+        .btn-right { grid-column: 3; }
+
+        /* Overlay Popups (Start Screen & Game Over) */
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(44, 62, 80, 0.92); backdrop-filter: blur(4px);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; z-index: 50; padding: 20px; text-align: center;
+        }
+        .overlay h2 { margin: 0 0 10px 0; font-size: 26px; color: #f1c40f; }
+        .overlay p { margin: 4px 0; font-size: 13px; color: #ecf0f1; }
+        .play-btn {
+            margin-top: 15px; padding: 12px 28px; font-size: 18px; font-weight: bold;
+            background: #2ecc71; color: white; border: none; border-radius: 25px;
+            cursor: pointer; box-shadow: 0 4px #27ae60; transition: transform 0.1s;
+        }
+        .play-btn:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+
+    <h3>🐾 Animal Chaser: Ultimate</h3>
+
+    <div class="header-box">
+        <div>🏆 <span id="score-val" class="score-title">0</span></div>
+        <div class="lives-box" id="lives-val">❤️❤️❤️</div>
+        <div>🥇 <span id="highscore-val">0</span></div>
+        <button class="sound-btn" onclick="toggleSound()" id="sound-btn">🔊</button>
+    </div>
+
+    <!-- Dropdown Options -->
+    <div class="select-container">
+        <select id="theme-select" onchange="updateTheme(this.value)">
+            <option value="classic">🌤️ Sky Blue</option>
+            <option value="forest">🌲 Soft Green</option>
+            <option value="desert">🌵 Warm Peach</option>
+            <option value="space">🚀 Dreamy Purple</option>
+            <option value="aqua">🌊 Underwater Aqua</option>
+            <option value="candy">🍬 Candy Pink</option>
+            <option value="galaxy">🌙 Night Galaxy</option>
+        </select>
+
+        <select id="animal-select" onchange="updateCharacter('player', this.value)">
+            <option value="🐱">🐱 Cat</option>
+            <option value="🐶">🐶 Dog</option>
+            <option value="🦁">🦁 Lion</option>
+            <option value="🐵">🐵 Monkey</option>
+            <option value="🐰">🐰 Bunny</option>
+            <option value="🐼">🐼 Panda</option>
+            <option value="🦊">🦊 Fox</option>
+            <option value="🐸">🐸 Frog</option>
+        </select>
+
+        <select id="food-select" onchange="updateCharacter('target', this.value)">
+            <option value="🍎">🍎 Apple</option>
+            <option value="🦴">🦴 Bone</option>
+            <option value="🥩">🥩 Meat</option>
+            <option value="🍌">🍌 Banana</option>
+            <option value="🥕">🥕 Carrot</option>
+            <option value="🧀">🧀 Cheese</option>
+            <option value="🐟">🐟 Fish</option>
+            <option value="🍕">🍕 Pizza</option>
+        </select>
+
+        <select id="enemy-select" onchange="updateCharacter('enemy', this.value)">
+            <option value="👾">👾 Monster</option>
+            <option value="💣">💣 Bomb</option>
+            <option value="👻">👻 Ghost</option>
+            <option value="🌵">🌵 Cactus</option>
+        </select>
+    </div>
+
+    <!-- Game Board -->
+    <div id="game-container">
+        <!-- Start Screen Modal -->
+        <div id="start-screen" class="overlay">
+            <h2>🐾 ANIMAL CHASER</h2>
+            <p>🏆 Best Score: <b id="start-highscore" style="color:#f1c40f;">0</b></p>
+            <p style="margin-top: 10px;"><b>How to Play:</b></p>
+            <p>🍎 Eat food to gain score (+1)</p>
+            <p>👾 Avoid enemies (Lose 1 Life ❤️)</p>
+            <p>⭐ Catch stars for 5s Speed Boost!</p>
+            <button class="play-btn" onclick="startGame()">▶️ START GAME</button>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div id="gameover-screen" class="overlay" style="display: none;">
+            <h2>💀 GAME OVER</h2>
+            <p>Your Score: <b id="final-score" style="color:#f1c40f;">0</b></p>
+            <p>High Score: <b id="final-highscore" style="color:#2ecc71;">0</b></p>
+            <button class="play-btn" onclick="startGame()">🔄 PLAY AGAIN</button>
+        </div>
+
+        <div id="player" class="character">🐱</div>
+        <div id="target" class="character">🍎</div>
+        <div id="enemy" class="character">👾</div>
+        <div id="star" class="character" style="display:none;">⭐</div>
+    </div>
+
+    <div class="hint">💻 Arrow Keys | 📱 Swipe or Touch Buttons</div>
+
+    <!-- Mobile Buttons -->
+    <div class="controls">
+        <button class="btn btn-up" onclick="move('up')">▲</button>
+        <button class="btn btn-left" onclick="move('left')">◀</button>
+        <button class="btn btn-down" onclick="move('down')">▼</button>
+        <button class="btn btn-right" onclick="move('right')">▶</button>
+    </div>
+
+    <script>
+        let px = 50, py = 50, tx = 200, ty = 150, ex = 100, ey = 200, sx = -100, sy = -100;
+        let score = 0, lives = 3, baseSpeed = 25, currentSpeed = 25;
+        let highScore = localStorage.getItem('chaserUltimateScore') || 0;
+        let isEating = false, isGameActive = false, soundOn = true;
+
+        const player = document.getElementById('player');
+        const target = document.getElementById('target');
+        const enemy = document.getElementById('enemy');
+        const star = document.getElementById('star');
+        const container = document.getElementById('game-container');
+        const scoreVal = document.getElementById('score-val');
+        const livesVal = document.getElementById('lives-val');
+        const highscoreVal = document.getElementById('highscore-val');
+        const startScreen = document.getElementById('start-screen');
+        const gameoverScreen = document.getElementById('gameover-screen');
+
+        const themes = {
+            classic: "#e0f2fe", forest: "#dcfce7", desert: "#ffedd5", 
+            space: "#faf5ff", aqua: "#cff4fc", candy: "#fce7f3", galaxy: "#1e1e2e"
+        };
+
+        highscoreVal.innerText = highScore;
+        document.getElementById('start-highscore').innerText = highScore;
+
+        function updateTheme(v) { container.style.background = themes[v]; }
+        function updateCharacter(type, emoji) { document.getElementById(type).innerText = emoji; }
+
+        function toggleSound() {
+            soundOn = !soundOn;
+            document.getElementById('sound-btn').innerText = soundOn ? "🔊" : "🔇";
+        }
+
+        // Web Audio Synthesizer
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if(!soundOn || !isGameActive) return;
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+
+            if(type === 'eat') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(450, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+            } else if(type === 'hit') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(280, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(90, audioCtx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+            } else if(type === 'star') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            }
+        }
+
+        function startGame() {
+            score = 0; lives = 3; currentSpeed = baseSpeed;
+            scoreVal.innerText = score;
+            livesVal.innerText = "❤️".repeat(lives);
+            startScreen.style.display = 'none';
+            gameoverScreen.style.display = 'none';
+            isGameActive = true;
+            px = 50; py = 50;
+            spawnTarget(); spawnEnemy();
+        }
+
+        function gameOver() {
+            isGameActive = false;
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('final-highscore').innerText = highScore;
+            gameoverScreen.style.display = 'flex';
+        }
+
+        function showFloatingText(text, isPositive) {
+            const el = document.createElement('div');
+            el.className = `floating-text ${isPositive ? 'plus-one' : 'minus-one'}`;
+            el.innerText = text;
+            el.style.left = (px + 10) + 'px'; el.style.top = (py - 10) + 'px';
+            container.appendChild(el);
+            setTimeout(() => el.remove(), 600);
+        }
+
+        // Crown Popup Effect on Character Head
+        function triggerCrownEffect() {
+            const crown = document.createElement('div');
+            crown.className = 'crown-popup';
+            crown.innerText = '👑';
+            crown.style.left = (px + 5) + 'px';
+            crown.style.top = (py - 15) + 'px';
+
+            container.appendChild(crown);
+            setTimeout(() => crown.remove(), 1200);
+        }
+
+        // Keyboard Controls
+        window.addEventListener('keydown', e => {
+            if(!isGameActive) return;
+            if (e.key === 'ArrowUp') move('up');
+            if (e.key === 'ArrowDown') move('down');
+            if (e.key === 'ArrowLeft') move('left');
+            if (e.key === 'ArrowRight') move('right');
+        });
+
+        // Swipe Controls
+        let touchStartX = 0, touchStartY = 0;
+        container.addEventListener('touchstart', e => {
+            touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
+        }, {passive: true});
+
+        container.addEventListener('touchend', e => {
+            if(!isGameActive) return;
+            let diffX = e.changedTouches[0].clientX - touchStartX;
+            let diffY = e.changedTouches[0].clientY - touchStartY;
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                if (diffX > 20) move('right'); else if (diffX < -20) move('left');
+            } else {
+                if (diffY > 20) move('down'); else if (diffY < -20) move('up');
+            }
+        }, {passive: true});
+
+        function move(dir) {
+            if(!isGameActive) return;
+            const charSize = 42;
+            const limitX = container.clientWidth - charSize - 10;
+            const limitY = 340 - charSize - 10;
+
+            if (dir === 'up') py = Math.max(10, py - currentSpeed);
+            if (dir === 'down') py = Math.min(limitY, py + currentSpeed);
+            if (dir === 'left') px = Math.max(10, px - currentSpeed);
+            if (dir === 'right') px = Math.min(limitX, px + currentSpeed);
+            
+            update(); checkCollision();
+        }
+
+        function update() {
+            player.style.left = px + 'px'; player.style.top = py + 'px';
+            target.style.left = tx + 'px'; target.style.top = ty + 'px';
+            enemy.style.left = ex + 'px'; enemy.style.top = ey + 'px';
+            star.style.left = sx + 'px'; star.style.top = sy + 'px';
+        }
+
+        function spawnTarget() {
+            tx = Math.floor(Math.random() * (container.clientWidth - 50)) + 10;
+            ty = Math.floor(Math.random() * (340 - 50)) + 10;
+            update();
+        }
+
+        function spawnEnemy() {
+            ex = Math.floor(Math.random() * (container.clientWidth - 50)) + 10;
+            ey = Math.floor(Math.random() * (340 - 50)) + 10;
+            if(Math.abs(px - ex) < 45 && Math.abs(py - ey) < 45) spawnEnemy();
+            update();
+        }
+
+        function spawnStar() {
+            if(isGameActive && Math.random() > 0.4 && star.style.display === 'none') {
+                sx = Math.floor(Math.random() * (container.clientWidth - 50)) + 10;
+                sy = Math.floor(Math.random() * (340 - 50)) + 10;
+                star.style.display = 'flex'; update();
+                setTimeout(() => { star.style.display = 'none'; }, 4000);
+            }
+        }
+        setInterval(spawnStar, 12000);
+
+        function checkCollision() {
+            if(!isGameActive) return;
+
+            // Food Collision
+            if(Math.abs(px - tx) < 35 && Math.abs(py - ty) < 35 && !isEating) {
+                isEating = true; playSound('eat'); showFloatingText('+1 ✨', true);
+                
+                const orig = document.getElementById('animal-select').value;
+                player.innerText = "😋";
+
+                setTimeout(() => {
+                    score++; scoreVal.innerText = score;
+                    if(score > highScore) {
+                        highScore = score;
+                        localStorage.setItem('chaserUltimateScore', highScore);
+                        highscoreVal.innerText = highScore;
+                        triggerCrownEffect();
+                    }
+                    player.innerText = orig;
+                    spawnTarget(); isEating = false;
+                    if(Math.random() > 0.45) spawnEnemy();
+                }, 200);
+            }
+
+            // Star Boost Collision
+            if(star.style.display !== 'none' && Math.abs(px - sx) < 35 && Math.abs(py - sy) < 35) {
+                star.style.display = 'none'; playSound('star'); showFloatingText('SPEED UP! ⚡', true);
+                currentSpeed = 42; player.classList.add('boost-active');
+                setTimeout(() => { currentSpeed = baseSpeed; player.classList.remove('boost-active'); }, 5000);
+            }
+
+            // Enemy Hit Collision
+            if(Math.abs(px - ex) < 35 && Math.abs(py - ey) < 35) {
+                playSound('hit'); showFloatingText('-1 ❤️', false);
+                container.classList.add('shake-effect');
+                setTimeout(() => container.classList.remove('shake-effect'), 250);
+
+                lives--;
+                livesVal.innerText = lives > 0 ? "❤️".repeat(lives) : "💀";
+                if(lives <= 0) {
+                    gameOver();
+                } else {
+                    spawnEnemy();
+                }
+            }
+        }
+    </script>
+</body>
+  </html>
+      
